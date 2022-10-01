@@ -36,7 +36,9 @@ contract RemBurner {
         return 0;
     }
 
-    function calculateRateUpdate(uint256 _totalExchanged)
+    function calculateRateUpdate(
+        uint256 _totalExchanged
+    )
         public
         view
         returns(uint256)
