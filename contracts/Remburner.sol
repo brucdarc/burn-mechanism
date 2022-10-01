@@ -8,11 +8,12 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract RemBurner {
 
-    uint256 public lastValue;
+    uint256 public lastRate;
     uint256 public lastResetTimestamp;
-    uint256 public minValue;
-    uint256 public maxValue;
+    uint256 public minRate;
+    uint256 public maxRate;
     IERC20 public stableCoin;
+    uint256 resetThreshold = 250e18; //Stablecoin value to complete reset from max to min, anything less causes only partial reset (linear decrease)
 
     uint256 constant THREE_HOURS = 3 hours;
     uint256 constant PRECISION_FACTOR = 1e18;
@@ -22,10 +23,10 @@ contract RemBurner {
     //exchange rate is a decimal percentage scaled to PRECISION_FACTOR
     function getCurrentExchangeRate() public view returns (uint256){
         uint256 timeElapsed = block.timestamp - lastResetTimestamp;
-        uint256 valueIncrease = (maxValue - minValue) * timeElapsed / THREE_HOURS;
-        uint256 totalPrice = valueIncrease + lastValue;
-        if(totalPrice > maxValue) return maxValue;
-        return totalPrice;
+        uint256 rateIncrease = (maxRate - minRate) * timeElapsed / THREE_HOURS;
+        uint256 totalRate = rateIncrease + lastRate;
+        if(totalRate > maxRate) return maxRate;
+        return totalRate;
     }
 
     //Give exchange rate between a particular depegged asset and the stablecoin.
@@ -35,8 +36,26 @@ contract RemBurner {
         return 0;
     }
 
+    function updateRate(uint256 _totalExchanged) internal {
+        if(_totalExchanged > resetThreshold){
+            lastRate = minRate;
+            lastResetTimestamp = block.timestamp;
+            return;
+        }
+        uint256 rateDecreasePercentage = _totalExchanged * PRECISION_FACTOR / resetThreshold;
+        lastRate = lastRate - (maxRate - minRate) * rateDecreasePercentage / PRECISION_FACTOR;
+        lastResetTimestamp = block.timestamp;
+
+    }
+
     //_minExchangeRate parameter to prevent frontrunner sabotage, works similar to slippage param
-    function exchange(IERC20 _asset, uint256 _amount, uint256 _minExchangeRate){
+    function exchange(
+        IERC20 _asset,
+        uint256 _amount,
+        uint256 _minExchangeRate
+    )
+        external
+    {
         uint256 currentExchangeRate = getCurrentExchangeRate();
         require(currentExchangeRate > _minExchangeRate, "RATE BELOW REQUESTED FLOOR");
 
@@ -47,6 +66,8 @@ contract RemBurner {
         uint256 assetTotalValue = _amount * assetValue / PRECISION_FACTOR;
 
         uint256 assetExchangeValue = assetTotalValue * currentPrice / PRECISION_FACTOR;
+
+        updateRate();
 
         stableCoin.transfer(msg.sender, assetExchangeValue);
     }
