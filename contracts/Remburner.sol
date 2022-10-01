@@ -36,16 +36,22 @@ contract RemBurner {
         return 0;
     }
 
-    function updateRate(uint256 _totalExchanged) internal {
+    function calculateRateUpdate(uint256 _totalExchanged)
+        public
+        view
+        returns(uint256)
+    {
         if(_totalExchanged > resetThreshold){
-            lastRate = minRate;
-            lastResetTimestamp = block.timestamp;
-            return;
+            return minRate;
         }
         uint256 rateDecreasePercentage = _totalExchanged * PRECISION_FACTOR / resetThreshold;
-        lastRate = lastRate - (maxRate - minRate) * rateDecreasePercentage / PRECISION_FACTOR;
-        lastResetTimestamp = block.timestamp;
+        uint256 resultRate = lastRate - (maxRate - minRate) * rateDecreasePercentage / PRECISION_FACTOR;
+        return resultRate;
+    }
 
+    function updateRate(uint256 _totalExchanged) internal {
+        lastRate = calculateRateUpdate(_totalExchanged);
+        lastResetTimestamp = block.timestamp;
     }
 
     //_minExchangeRate parameter to prevent frontrunner sabotage, works similar to slippage param
@@ -65,9 +71,9 @@ contract RemBurner {
 
         uint256 assetTotalValue = _amount * assetValue / PRECISION_FACTOR;
 
-        uint256 assetExchangeValue = assetTotalValue * currentPrice / PRECISION_FACTOR;
+        uint256 assetExchangeValue = assetTotalValue * currentExchangeRate / PRECISION_FACTOR;
 
-        updateRate();
+        updateRate(assetExchangeValue);
 
         stableCoin.transfer(msg.sender, assetExchangeValue);
     }
