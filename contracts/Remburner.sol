@@ -2,11 +2,12 @@
 pragma solidity ^0.8.17;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
 // Uncomment this line to use console.log
 // import "hardhat/console.sol";
 
-contract RemBurner {
+contract RemBurner is Ownable{
 
     uint256 public lastRate;
     uint256 public lastResetTimestamp;
@@ -15,9 +16,30 @@ contract RemBurner {
     IERC20 public stableCoin;
     uint256 resetThreshold = 250e18; //Stablecoin value to complete reset from max to min, anything less causes only partial reset (linear decrease)
 
+    mapping (address => bool) allowList;
+
     uint256 constant THREE_HOURS = 3 hours;
     uint256 constant PRECISION_FACTOR = 1e18;
 
+    modifier onlyAllowlisted(){
+        require(allowList[msg.sender] == true, "NOT ALLOWLISTED");
+        _;
+    }
+
+    constructor(uint256 _minRate, uint256 _maxRate, IERC20 _stableCoin){
+        minRate = _minRate;
+        _maxRate = _maxRate;
+        stableCoin = _stableCoin;
+        lastRate = _minRate;
+        lastResetTimestamp = block.timestamp;
+    }
+
+    //Sending a bool array allows us to just use one function instead of multiple for add/remove
+    function setupAllowlist(address[] calldata users, bool[] calldata allowed) external onlyOwner{
+        for(uint256 i=0; i < users.length; i++) {
+            allowList[users[i]] = allowed[i];
+        }
+    }
 
     //Scale linearly from min to max over 3 hours
     //exchange rate is a decimal percentage scaled to PRECISION_FACTOR
@@ -32,6 +54,7 @@ contract RemBurner {
     //Give exchange rate between a particular depegged asset and the stablecoin.
     //These values should ideally be snapshotted from the instant of the hack to avoid dynamic pricing
     //Is a decimal percentage scaled to PRECISION_FACTOR
+    //@TODO implement
     function getAssetRate(IERC20 _asset) public view returns (uint256){
         return 0;
     }
@@ -63,6 +86,7 @@ contract RemBurner {
         uint256 _minExchangeRate
     )
         external
+        onlyAllowlisted
     {
         uint256 currentExchangeRate = getCurrentExchangeRate();
         require(currentExchangeRate > _minExchangeRate, "RATE BELOW REQUESTED FLOOR");
