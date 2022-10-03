@@ -91,8 +91,6 @@ contract RemBurner is Ownable{
         uint256 currentExchangeRate = getCurrentExchangeRate();
         require(currentExchangeRate > _minExchangeRate, "RATE BELOW REQUESTED FLOOR");
 
-        _asset.transferFrom(msg.sender, address(0x0), _amount);
-
         uint256 assetValue = getAssetRate(_asset);
 
         uint256 assetTotalValue = _amount * assetValue / PRECISION_FACTOR;
@@ -100,6 +98,8 @@ contract RemBurner is Ownable{
         uint256 assetExchangeValue = assetTotalValue * currentExchangeRate / PRECISION_FACTOR;
 
         updateRate(assetExchangeValue);
+        
+        _asset.transferFrom(msg.sender, address(0x0), _amount);
 
         stableCoin.transfer(msg.sender, assetExchangeValue);
     }
