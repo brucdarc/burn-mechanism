@@ -70,7 +70,7 @@ contract RemBurner is Ownable{
             return minRate;
         }
         uint256 rateDecreasePercentage = _totalExchanged * PRECISION_FACTOR / resetThreshold;
-        uint256 resultRate = lastRate - (maxRate - minRate) * rateDecreasePercentage / PRECISION_FACTOR;
+        uint256 resultRate = getCurrentExchangeRate() - (maxRate - minRate) * rateDecreasePercentage / PRECISION_FACTOR;
         return resultRate;
     }
 
